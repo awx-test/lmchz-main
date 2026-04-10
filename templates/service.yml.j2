@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-{{ resource_name }}
+  namespace: lmchz
+  annotations:
+    metallb.universe.tf/loadBalancerIPs: {{ service_ip }}
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
+  selector:
+    instance: {{ resource_name }}
+  ports:
+  - protocol: TCP
+    port: 5995
+    targetPort: 5995

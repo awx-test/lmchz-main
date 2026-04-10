@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ resource_name }}
+  namespace: lmchz
+  labels:
+    app: lmchz-app
+    instance: {{ resource_name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lmchz-app
+      instance: {{ resource_name }}
+  template:
+    metadata:
+      labels:
+        app: lmchz-app
+        instance: {{ resource_name }}
+        expected-ip: {{ service_ip }}
+    spec:
+      containers:
+      - name: {{ resource_name }}
+        image: rodjat/regime:2.1.0-619-ubuntu22_amd64
+        ports:
+        - containerPort: 5995
+          name: http
+        volumeMounts:
+        - name: regime-config
+          mountPath: /opt/regime/etc
+        - name: regime-data
+          mountPath: /opt/yenisei/data
+        - name: regime-log
+          mountPath: /var/log/regime
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "300m"
+          limits:
+            cpu: "3000m"
+      volumes:
+      - name: regime-config
+        configMap:
+          name: config-{{ resource_name }}
+      - name: regime-data
+        emptyDir: {}
+      - name: regime-log
+        emptyDir: {}

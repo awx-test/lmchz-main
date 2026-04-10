@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-{{ resource_name }}
+  namespace: lmchz
+data:
+  ext.ini: |
+    [api]
+    login = {{ lmchzuser }}
+    password = {{ lmchzpass }}
+
+    [remote]
+    service_url = https://rsapi.crpt.ru
+    proxy_host = {{ mtip }}
+    proxy_port = 8080
+

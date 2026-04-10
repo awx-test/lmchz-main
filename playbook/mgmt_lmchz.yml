@@ -1,0 +1,181 @@
+---
+- name: Download vars table
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Download file with var
+      ansible.builtin.get_url:
+        url: https://docs.google.com/spreadsheets/d/{{ tokengoogleegs }}/export?format=csv&sheet=ro
+        dest: ../file/usbdata.csv
+        mode: '0755'
+
+- name: Get var from csv file
+  hosts: localhost
+  gather_facts: false
+  vars:
+    nstroki:     35
+    path_csv:    ../file/usbdata.csv
+    magadr:      "{{ lookup('csvfile','{{ nstroki }} file={{ path_csv }} delimiter=, col=6') }}"
+    mtip:        "{{ lookup('csvfile','{{ nstroki }} file={{ path_csv }} delimiter=, col=2') | replace('.','.')}}"
+    service_ip:        "{{ lookup('csvfile','{{ nstroki }} file={{ path_csv }} delimiter=, col=3') | replace('.','.')}}"
+    inn:         "{{ lookup('csvfile','{{ nstroki }} file={{ path_csv }} delimiter=, col=4') }}"
+    token:       "{{ lookup('csvfile','{{ nstroki }} file={{ path_csv }} delimiter=, col=5') }}"
+    state_in_table:     "{{ lookup('csvfile','{{ nstroki }} file={{ path_csv }} delimiter=, col=1') }}"
+    resource_name:  "{{ nstroki }}-lmchz-{{ service_ip | replace('10.216.1.','') }}"
+    varisok:      0
+    current_state: 0
+    k8s_host: "http://k8s-api.pivzavoz.local:6443"
+    k8s_validate_certs: false  # ⚠️ только для dev/staging! Для prod используйте true + ca_cert
+    # k8s_ca_cert: "/path/to/ca.crt"  # раскомментируйте для продакшена
+    # k8s_kubeconfig: "{{ playbook_dir }}/kubeconfig/config"  # если используете kubeconfig
+
+  tasks:
+##############################################################################################################
+    - name: Play for lmchz
+      ansible.builtin.debug:
+        msg: "Запуск плейбука для: {{ nstroki }} / {{ magadr }} / {{ inn }} / {{ resource_name }} / {{ service_ip }} / {{ token }} / {{ state_in_table }}"
+##############################################################################################################
+
+    - name: Check var
+      ansible.builtin.set_fact:
+        varisok: 1
+      when:
+      # Проверяем чтобы usbkey был правильно введен(1 число от 1 до 99 включительно | 2 число от 1 до 4 включительно | 3 число от 1 до 16 включительно)
+        - nstroki >= 1 and nstroki <=249
+      # Проверяем что service_ip из диапазона 10.216.1.(1-249)
+        - service_ip is regex("^10.216.1.(2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[1-9])$")
+      # Проверяем что vm_state имеет одно из начений RUN, STOP, DELETE
+        - state_in_table == "RUN" or state_in_table == "DELETE"
+
+    - name: SET current_state
+      ansible.builtin.set_fact:
+        current_state: poweredon
+      when:
+        - varisok == 1 and state_in_table == "RUN"
+
+    - name: SET current_state DELETE
+      ansible.builtin.set_fact:
+        current_state: absent
+      when:
+        - varisok == 1 and state_in_table == "DELETE"
+
+    - name: Deploy ConfigMap
+      include_tasks: includes/deploy_resource.yml
+      vars:
+        resource_name: ConfigMap
+        path_template: ../templates/configmap.yaml.j2
+      register: configmap_deploy_result
+
+    - name: Deploy Deployment
+      include_tasks: includes/deploy_resource.yml
+      vars:
+        resource_name: Deployment
+        path_template: ../templates/deployment.yaml.j2
+      register: deployment_deploy_result
+
+    - name: Deploy Service
+      include_tasks: includes/deploy_resource.yml
+      vars:
+        resource_name: Service
+        path_template: ../templates/service.yaml.j2
+      register: service_deploy_result
+
+    - name: Check deploy
+      ansible.builtin.debug:
+        msg: "{{ configmap_deploy_result }} {{ deployment_deploy_result }} {{ service_deploy_result }}"
+
+###########################################################################################################
+#    - name: Set ip magazin proxy
+#      community.routeros.command:
+#        commands:
+#          - /ip proxy set cache-path=web-proxy1 enabled=yes max-cache-size=10000KiB src-address="{{ mtip }}"
+#          - /ip proxy access remove numbers=0
+#          - delay 1s
+#          - /ip proxy access remove numbers=1
+#          - delay 1s
+#          - /ip proxy access remove numbers=2
+#          - delay 1s
+#          - /ip proxy access remove numbers=0
+#          - delay 1s
+#          - /ip proxy access remove numbers=1
+#          - delay 1s
+#          - /ip proxy access remove numbers=2
+#          - delay 1s
+#          - /ip proxy access remove numbers=0
+#          - delay 1s
+#          - /ip proxy access remove numbers=1
+#          - delay 1s
+#          - /ip proxy access remove numbers=2
+#          - delay 5s
+#          - /ip proxy access add src-address="{{ service_ip }}" action=allow
+#          - delay 5s
+#          - /ip proxy access add action=deny
+#      delegate_to: "{{ mtip }}"
+#      register: proxyset
+#      when:
+#        - varisok == 1 and state_in_table == "RUN"
+##################################################################################################################
+#    - name: Pause 15s for up proxy
+#      ansible.builtin.pause:
+#        seconds: 15
+#      when: varisok == 1 and state_in_table == "RUN" and proxyset.changed
+
+    - name: Check lmchz is UP
+      ansible.builtin.uri:
+        url: "http://{{ service_ip }}:5995/api/v2/status"
+        user: "{{ lmchzuser }}"
+        password: "{{ lmchzpass }}"
+        method: get
+        force_basic_auth: true
+        status_code: 200
+      register: lmchzgetup
+      until: lmchzgetup is succeeded
+      retries: 6
+      delay: 10
+      when:
+        - varisok == 1 and state_in_table == "RUN"
+##################################################################################################################
+#    - name: INIT lmchz
+#      ansible.builtin.uri:
+#        url: "http://{{ service_ip }}:5995/api/v2/init"
+#        user: "{{ lmchzuser }}"
+#        password: "{{ lmchzpass }}"
+#        method: post
+#        force_basic_auth: true
+#        headers:
+#          Content-Type: application/json
+#        body_format: json
+#        body: { "token": "{{ token }}" }
+#        status_code: 200
+#      register: lmchzpost
+#      when:
+#        - varisok == 1 and state_in_table == "RUN"
+#        - lmchzgetup is succeeded
+#        - installlmchz.changed
+#      ignore_errors: true
+
+##################################################################################################################
+#    - name: Check lmchz is configured
+#      ansible.builtin.uri:
+#        url: "http://{{ service_ip }}:5995/api/v2/status"
+#        user: "{{ lmchzuser }}"
+#        password: "{{ lmchzpass }}"
+#        method: get
+#        force_basic_auth: true
+#        status_code: 200
+#      register: lmchzgetconf
+#      until: lmchzgetconf.json.status == 'ready' or lmchzgetconf.json.status == 'initialization'
+#      retries: 10
+#      delay: 30
+#      when:
+#        - varisok == 1 and state_in_table == "RUN"
+#
+#    - name: Set API token
+#      ansible.builtin.set_fact:
+#        ansible_zabbix_auth_key: "{{ zabbixtoken }}"
+
+#    - name: Import task zabbixaddhost
+#      ansible.builtin.import_tasks:
+#        file: zabbixaddhost.yml
+#      when:
+#        - varisok == 1
