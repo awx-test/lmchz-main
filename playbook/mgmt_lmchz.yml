@@ -55,7 +55,7 @@
     resource_name:  "{{ nstroki }}-lmchz-{{ service_ip | replace('10.216.1.','') }}"
     varisok:      0
     current_state: 0
-    k8s_host: "http://k8s-api.pivzavoz.local:6443"
+    k8s_host: "https://10.216.1.251:6443"
     k8s_validate_certs: false  # ⚠️ только для dev/staging! Для prod используйте true + ca_cert
     # k8s_ca_cert: "/path/to/ca.crt"  # раскомментируйте для продакшена
     # k8s_kubeconfig: "{{ playbook_dir }}/kubeconfig/config"  # если используете kubeconfig
