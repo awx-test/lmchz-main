@@ -3,23 +3,35 @@
   hosts: localhost
   gather_facts: false
   tasks:
-    - name: Download file with var
-      uri:
-        url: "https://docs.google.com/spreadsheets/d/{{ tokengoogleegs }}/export?format=csv&sheet=ro"
-        dest: "../file/usbdata.csv"
-        method: GET
-        status_code: [ 200, 302, 307 ]
-        follow_redirects: all
-        timeout: 60
-        validate_certs: yes
-        register: download
-
-    - name: Save content to file
-      copy:
-        content: "{{ download.content }}"
-        dest: "../file/usbdata.csv"
+    - name: Create directory
+      file:
+        path: "../file"
+        state: directory
         mode: '0755'
-      when: download.status in [200, 302, 307] and download.content is defined
+
+    - name: Download CSV with curl
+      command: >
+        curl -L --connect-timeout 30 --max-time 120
+        -o "../file/usbdata.csv"
+        "https://docs.google.com/spreadsheets/d/{{ tokengoogleegs }}/export?format=csv&sheet=ro"
+      args:
+        creates: "../file/usbdata.csv"
+      register: curl_download
+      ignore_errors: yes
+
+    - name: Check curl result
+      debug:
+        var: curl_download
+
+    - name: Verify file exists
+      stat:
+        path: "../file/usbdata.csv"
+      register: file_stat
+
+    - name: Show file info
+      debug:
+        msg: "File size: {{ file_stat.stat.size }} bytes"
+      when: file_stat.stat.exists
 
 
 #    - name: Download file with var
