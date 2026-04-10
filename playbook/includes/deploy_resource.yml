@@ -1,9 +1,3 @@
-- name: Deploy application to Kubernetes cluster
-  hosts: localhost
-  connection: local
-  gather_facts: false
-
-  tasks:
     - name: Render manifest from Jinja2 template
       ansible.builtin.debug:
         msg: "Deploying {{ resource_name }} to {{ k8s_host }}"
