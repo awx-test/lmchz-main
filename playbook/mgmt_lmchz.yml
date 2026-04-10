@@ -3,6 +3,9 @@
   hosts: localhost
   gather_facts: false
   tasks:
+    - name: Check var
+      ansible.builtin.debug:
+        msg: "https://docs.google.com/spreadsheets/d/{{ tokengoogleegs }}/export?format=csv&sheet=ro"
     - name: Download file with var
       ansible.builtin.get_url:
         url: https://docs.google.com/spreadsheets/d/{{ tokengoogleegs }}/export?format=csv&sheet=ro
