@@ -1,4 +1,3 @@
----
 - name: Deploy application to Kubernetes cluster
   hosts: localhost
   connection: local
