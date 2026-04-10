@@ -5,14 +5,10 @@
     - name: Apply deploy to Kubernetes cluster
       kubernetes.core.k8s:
         state: present
-        # Рендерим шаблон и парсим YAML в словарь
         definition: "{{ lookup('template', path_template) | from_yaml }}"
-        # Параметры подключения к API
         host: "{{ k8s_host }}"
-        validate_certs: "{{ k8s_validate_certs }}"
-        ca_cert: "{{ k8s_ca_cert | default(omit) }}"
-        kubeconfig: "{{ k8s_kubeconfig | default(omit) }}"
-        # Опционально: ждать готовности деплоймента
+        api_key: "{{ k8s_api_key }}"
+        validate_certs: "{{ k8s_validate_certs | default(false) }}"
         wait: true
         wait_timeout: 300
       register: deploy_result
