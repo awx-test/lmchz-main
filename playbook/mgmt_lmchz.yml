@@ -3,14 +3,30 @@
   hosts: localhost
   gather_facts: false
   tasks:
-    - name: Check var
-      ansible.builtin.debug:
-        msg: "https://docs.google.com/spreadsheets/d/{{ tokengoogleegs }}/export?format=csv&sheet=ro"
     - name: Download file with var
-      ansible.builtin.get_url:
-        url: https://docs.google.com/spreadsheets/d/{{ tokengoogleegs }}/export?format=csv&sheet=ro
-        dest: ../file/usbdata.csv
+      uri:
+        url: "https://docs.google.com/spreadsheets/d/{{ tokengoogleegs }}/export?format=csv&sheet=ro"
+        dest: "../file/usbdata.csv"
+        method: GET
+        status_code: [ 200, 302, 307 ]
+        follow_redirects: all
+        timeout: 60
+        validate_certs: yes
+        register: download
+
+    - name: Save content to file
+      copy:
+        content: "{{ download.content }}"
+        dest: "../file/usbdata.csv"
         mode: '0755'
+      when: download.status in [200, 302, 307] and download.content is defined
+
+
+#    - name: Download file with var
+#      ansible.builtin.get_url:
+#        url: https://docs.google.com/spreadsheets/d/{{ tokengoogleegs }}/export?format=csv&sheet=ro
+#        dest: ../file/usbdata.csv
+#        mode: '0755'
 
 - name: Get var from csv file
   hosts: localhost
