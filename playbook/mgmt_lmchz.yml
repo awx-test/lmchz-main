@@ -93,21 +93,21 @@
     - name: Deploy ConfigMap
       include_tasks: includes/deploy_resource.yml
       vars:
-        resource_name: ConfigMap
+        resource_name_log: ConfigMap
         path_template: "{{ playbook_dir }}/../templates/configmap.yml.j2"
       register: configmap_deploy_result
 
     - name: Deploy Deployment
       include_tasks: includes/deploy_resource.yml
       vars:
-        resource_name: Deployment
+        resource_name_log: Deployment
         path_template: "{{ playbook_dir }}/../templates/deployment.yml.j2"
       register: deployment_deploy_result
 
     - name: Deploy Service
       include_tasks: includes/deploy_resource.yml
       vars:
-        resource_name: Service
+        resource_name_log: Service
         path_template: "{{ playbook_dir }}/../templates/service.yml.j2"
       register: service_deploy_result
 

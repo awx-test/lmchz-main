@@ -1,6 +1,6 @@
     - name: Render manifest from Jinja2 template
       ansible.builtin.debug:
-        msg: "Deploying {{ resource_name }} to {{ k8s_host }}"
+        msg: "Deploying {{ resource_name_log }} to {{ k8s_host }}"
 
     - name: Apply deploy to Kubernetes cluster
       kubernetes.core.k8s:
