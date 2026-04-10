@@ -1,0 +1,268 @@
+---
+- name: Download vars table
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Download file with var
+      ansible.builtin.get_url:
+        url: https://docs.google.com/spreadsheets/d/{{ tokengoogleegs }}/export?format=csv&sheet=ro
+        dest: ../file/usbdata.csv
+        mode: '0755'
+
+- name: Get var from csv file
+  hosts: localhost
+  gather_facts: false
+  vars:
+    nstroki:     35
+    lmchz_link:  https://xn--80ajghhoc2aj1c8b.xn--p1ai/upload/ubuntu22_regime_1.3.1-369_amd64.deb
+    path_csv:    ../file/usbdata.csv
+    lmchzpack:   lmchz.deb
+    magadr:      "{{ lookup('csvfile','{{ nstroki }} file={{ path_csv }} delimiter=, col=6') }}"
+    mtip:        "{{ lookup('csvfile','{{ nstroki }} file={{ path_csv }} delimiter=, col=2') | replace('.','.')}}"
+    vmip:        "{{ lookup('csvfile','{{ nstroki }} file={{ path_csv }} delimiter=, col=3') | replace('.','.')}}"
+    inn:         "{{ lookup('csvfile','{{ nstroki }} file={{ path_csv }} delimiter=, col=4') }}"
+    token:       "{{ lookup('csvfile','{{ nstroki }} file={{ path_csv }} delimiter=, col=5') }}"
+    vmstate:     "{{ lookup('csvfile','{{ nstroki }} file={{ path_csv }} delimiter=, col=1') }}"
+    vmhostname:  "{{ nstroki }}-vmlmchz-{{ vmip | replace('10.216.1.','') }}"
+    vmvlan:      "900"
+    vmgateway:   "10.216.1.254"
+    vmnetmask:   "255.255.255.0"
+    vmmac:       "{{ '00:50:56' | community.general.random_mac }}"
+    cluster_name: Lmchz
+    dc:           Lmchz
+    cluster_ds:   Local R1-1Tb
+    template_vm:  TemplateU22
+    varisok:      0
+    statevmguest: 0
+    forcestate:   false
+    v_network:    VM Network (vlan 900)
+    upgradelmchz: false
+    zabbix_server: 192.168.124.244
+    localdl:       1
+
+  tasks:
+##############################################################################################################
+    - name: Play for lmchz
+      ansible.builtin.debug:
+        msg: "Запуск плейбука для: {{ nstroki }} / {{ magadr }} / {{ inn }} / {{ vmhostname }} / {{ vmip }} / {{ token }} / {{ vmstate }}"
+##############################################################################################################
+
+    - name: Check var
+      ansible.builtin.set_fact:
+        varisok: 1
+      when:
+      # Проверяем чтобы usbkey был правильно введен(1 число от 1 до 99 включительно | 2 число от 1 до 4 включительно | 3 число от 1 до 16 включительно)
+        - nstroki >= 1 and nstroki <=249
+      # Проверяем что vmip из диапазона 10.216.1.(1-249)
+        - vmip is regex("^10.216.1.(2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[1-9])$")
+      # Проверяем что vm_state имеет одно из начений RUN, STOP, DELETE
+        - vmstate == "RUN" or vmstate == "DELETE"
+
+    - name: SET statevmguest
+      ansible.builtin.set_fact:
+        statevmguest: poweredon
+        zabbixstate: present
+      when:
+        - varisok == 1 and vmstate == "RUN"
+
+    - name: SET statevmguest DELETE
+      ansible.builtin.set_fact:
+        statevmguest: absent
+        forcestate: true
+        zabbixstate: absent
+      when:
+        - varisok == 1 and vmstate == "DELETE"
+
+    - name: Create or delete VM
+      community.vmware.vmware_guest:
+        hostname   : "{{ vcenter_host }}"
+        username   : "{{ vcenter_user }}"
+        password   : "{{ vcenter_pass }}"
+        validate_certs: false
+        datacenter : "{{ dc }}"
+        folder     : "{{ cluster_name }}vm"
+        force      : "{{ forcestate }}"
+        template   : "{{ template_vm }}"
+        name       : "{{ vmhostname }}"
+        cluster    : "{{ cluster_name }}"
+        datastore  : "{{ cluster_ds }}"
+        networks:
+          - name   :     "{{ v_network }}"
+            ip     :     "{{ vmip }}"
+            netmask:     "{{ vmnetmask }}"
+            gateway:     "{{ vmgateway }}"
+            mac    :     "{{ vmmac }}"
+            dns_servers: "{{ vmgateway }}"
+            connected: true
+            start_connected: true
+            type: static
+        customization:
+          hostname   :   "{{ vmhostname }}"
+          dns_servers:   "{{ vmgateway }}"
+        state        :   "{{ statevmguest }}"
+        wait_for_ip_address: true
+      when: varisok == 1
+      register: createvmstate
+
+    - name: Pause 180s for up VM
+      ansible.builtin.pause:
+        minutes: 3
+      when: varisok == 1 and vmstate == "RUN" and createvmstate.changed
+#######################################################################################################
+
+    - name: Gather the package facts
+      ansible.builtin.package_facts:
+        manager: apt
+      become: true
+      delegate_to: "{{ vmip }}"
+      when: varisok == 1 and vmstate == "RUN"
+#######################################################################################################
+    - name: Download file deb frome site
+      ansible.builtin.get_url:
+        url: "{{ lmchz_link }}"
+        dest: /home/lmchz/{{ lmchzpack }}
+        mode: '0755'
+      delegate_to: "{{ vmip }}"
+      when:
+        - varisok == 1
+        - vmstate == "RUN"
+        - ('regime' not in ansible_facts.packages)
+        - localdl == 0
+########################################################################################################
+    - name: Download lmchz.deb from local ftp
+      ansible.builtin.get_url:
+        url: "ftp://awxftp:{{ awxftppass }}@10.9.0.9/{{ lmchzpack }}"
+        dest: "/home/lmchz/{{ lmchzpack }}"
+        mode: '0755'
+      become: true
+      register:  dllmchz
+      delegate_to: "{{ vmip }}"
+      when:
+        - varisok == 1
+        - vmstate == "RUN"
+        - ('regime' not in ansible_facts.packages)
+        - localdl == 1
+
+    - name: Ping VM
+      ansible.builtin.ping:
+      delegate_to: "{{ vmip }}"
+      when:
+        - varisok == 1 and vmstate == "RUN"
+
+#########################################################################################################
+
+    - name: Install deb and questions with responses
+      ansible.builtin.expect:
+        command: sudo apt install ./lmchz.deb
+        responses:
+          password for lmchz: "{{ ansible_user }}"
+          Do you want to continue: y
+          Regime admin name: "{{ lmchzuser }}"
+          Regime admin password: "{{ lmchzpass }}"
+          Remote server URL: https://rsapi.crpt.ru
+          Proxy server host: "{{ mtip }}"
+          Proxy server port: 8080
+          Proxy server user: " "
+      delegate_to: "{{ vmip }}"
+      register: installlmchz
+      when:
+        - varisok == 1
+        - vmstate == "RUN"
+        - "'regime' not in ansible_facts.packages"
+###########################################################################################################
+    - name: Set ip magazin proxy
+      community.routeros.command:
+        commands:
+          - /ip proxy set cache-path=web-proxy1 enabled=yes max-cache-size=10000KiB src-address="{{ mtip }}"
+          - /ip proxy access remove numbers=0
+          - delay 1s
+          - /ip proxy access remove numbers=1
+          - delay 1s
+          - /ip proxy access remove numbers=2
+          - delay 1s
+          - /ip proxy access remove numbers=0
+          - delay 1s
+          - /ip proxy access remove numbers=1
+          - delay 1s
+          - /ip proxy access remove numbers=2
+          - delay 1s
+          - /ip proxy access remove numbers=0
+          - delay 1s
+          - /ip proxy access remove numbers=1
+          - delay 1s
+          - /ip proxy access remove numbers=2
+          - delay 5s
+          - /ip proxy access add src-address="{{ vmip }}" action=allow
+          - delay 5s
+          - /ip proxy access add action=deny
+      delegate_to: "{{ mtip }}"
+      register: proxyset
+      when:
+        - varisok == 1 and vmstate == "RUN"
+        - installlmchz.changed
+##################################################################################################################
+    - name: Pause 15s for up proxy
+      ansible.builtin.pause:
+        seconds: 15
+      when: varisok == 1 and vmstate == "RUN" and proxyset.changed
+
+    - name: Check lmchz is UP
+      ansible.builtin.uri:
+        url: "http://{{ vmip }}:5995/api/v2/status"
+        user: "{{ lmchzuser }}"
+        password: "{{ lmchzpass }}"
+        method: get
+        force_basic_auth: true
+        status_code: 200
+      register: lmchzgetup
+      until: lmchzgetup is succeeded
+      retries: 6
+      delay: 10
+      when:
+        - varisok == 1 and vmstate == "RUN"
+        - installlmchz.changed
+##################################################################################################################
+    - name: INIT lmchz
+      ansible.builtin.uri:
+        url: "http://{{ vmip }}:5995/api/v2/init"
+        user: "{{ lmchzuser }}"
+        password: "{{ lmchzpass }}"
+        method: post
+        force_basic_auth: true
+        headers:
+          Content-Type: application/json
+        body_format: json
+        body: { "token": "{{ token }}" }
+        status_code: 200
+      register: lmchzpost
+      when:
+        - varisok == 1 and vmstate == "RUN"
+        - lmchzgetup is succeeded
+        - installlmchz.changed
+      ignore_errors: true
+
+##################################################################################################################
+    - name: Check lmchz is configured
+      ansible.builtin.uri:
+        url: "http://{{ vmip }}:5995/api/v2/status"
+        user: "{{ lmchzuser }}"
+        password: "{{ lmchzpass }}"
+        method: get
+        force_basic_auth: true
+        status_code: 200
+      register: lmchzgetconf
+      until: lmchzgetconf.json.status == 'ready' or lmchzgetconf.json.status == 'initialization'
+      retries: 10
+      delay: 30
+      when:
+        - varisok == 1 and vmstate == "RUN"
+
+    - name: Set API token
+      ansible.builtin.set_fact:
+        ansible_zabbix_auth_key: "{{ zabbixtoken }}"
+
+#    - name: Import task zabbixaddhost
+#      ansible.builtin.import_tasks:
+#        file: zabbixaddhost.yml
+#      when:
+#        - varisok == 1
