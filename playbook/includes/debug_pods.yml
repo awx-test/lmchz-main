@@ -12,18 +12,6 @@
         target_pod: "{{ pod_list.resources | selectattr('metadata.name', 'match', '^' + resource_name + '-') | first }}"
       when: pod_list.resources is defined
 
-    - name: Извлечь данные из найденного пода
-      vars:
-        pod: "{{ target_pod }}"
-      debug:
-        msg:
-          - "Имя: {{ pod.metadata.name }}"
-          - "Нода: {{ pod.spec.nodeName }}"
-          - "IP ноды: {{ pod.status.hostIP }}"
-          - "IP пода: {{ pod.status.podIP }}"
-          - "Статус: {{ pod.status.phase }}"
-      when: target_pod is defined
-
     - name: Установить переменные для дальнейшего использования
       set_fact:
         pod_name: "{{ target_pod.metadata.name }}"
@@ -31,6 +19,17 @@
         pod_ip: "{{ target_pod.status.podIP }}"
         host_ip: "{{ target_pod.status.hostIP }}"
         phase: "{{ target_pod.status.phase }}"
+      when: target_pod is defined
+
+    - name: Просмотр информации о поде
+      debug:
+        msg:
+          - "Имя: {{ pod_name }}"
+          - "Нода: {{ node_name }}"
+          - "IP ноды: {{ host_ip }}"
+          - "IP пода: {{ pod_ip }}"
+          - "Статус: {{ phase }}"
+      when: target_pod is defined
 
     - name: Ошибка если под не найден
       fail:
