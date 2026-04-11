@@ -26,11 +26,11 @@
 
     - name: Установить переменные для дальнейшего использования
       set_fact:
-        pod_name: "{{ pod.metadata.name }}"
-        node_name: "{{ pod.spec.nodeName }}"
-        pod_ip: "{{ pod.status.podIP }}"
-        host_ip: "{{ pod.status.hostIP }}"
-        phase: "{{ pod.status.phase }}"
+        pod_name: "{{ target_pod.metadata.name }}"
+        node_name: "{{ target_pod.spec.nodeName }}"
+        pod_ip: "{{ target_pod.status.podIP }}"
+        host_ip: "{{ target_pod.status.hostIP }}"
+        phase: "{{ target_pod.status.phase }}"
 
     - name: Ошибка если под не найден
       fail:
