@@ -7,10 +7,32 @@
         namespace: "lmchz"
       register: pod_list
 
-    - name: Показать список подов
-      debug:
-        msg: "{{ pod_list.resources | map(attribute='metadata.name') | list }}"
+    - name: Найти нужный под по имени (из предыдущей таски)
+      set_fact:
+        target_pod: "{{ pod_list.resources | selectattr('metadata.name', 'match', '^' + resource_name + '-') | first }}"
+      when: pod_list.resources is defined
 
-    - name: Показать детальную информацию о подах
+    - name: Извлечь данные из найденного пода
+      vars:
+        pod: "{{ target_pod }}"
       debug:
-        var: pod_list.resources
+        msg:
+          - "Имя: {{ pod.metadata.name }}"
+          - "Нода: {{ pod.spec.nodeName }}"
+          - "IP ноды: {{ pod.status.hostIP }}"
+          - "IP пода: {{ pod.status.podIP }}"
+          - "Статус: {{ pod.status.phase }}"
+      when: target_pod is defined
+
+    - name: Установить переменные для дальнейшего использования
+      set_fact:
+        pod_name: "{{ pod.metadata.name }}"
+        node_name: "{{ pod.spec.nodeName }}"
+        pod_ip: "{{ pod.status.podIP }}"
+        host_ip: "{{ pod.status.hostIP }}"
+        phase: "{{ pod.status.phase }}"
+
+    - name: Ошибка если под не найден
+      fail:
+        msg: "Под с именем {{ resource_name }} не найден в namespace lmchz"
+      when: target_pod is not defined
