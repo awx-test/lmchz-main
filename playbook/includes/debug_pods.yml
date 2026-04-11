@@ -1,4 +1,4 @@
-    - name: Получить список всех подов в namespace
+    - name: Get list of pods in namespace lmchz
       kubernetes.core.k8s_info:
         host: "{{ k8s_host }}"
         api_key: "{{ k8s_api_key }}"
@@ -7,12 +7,12 @@
         namespace: "lmchz"
       register: pod_list
 
-    - name: Найти нужный под по имени (из предыдущей таски)
+    - name: Match pod by name
       set_fact:
         target_pod: "{{ pod_list.resources | selectattr('metadata.name', 'match', '^' + resource_name + '-') | first }}"
       when: pod_list.resources is defined
 
-    - name: Установить переменные для дальнейшего использования
+    - name: Set facts for target pod
       set_fact:
         pod_name: "{{ target_pod.metadata.name }}"
         node_name: "{{ target_pod.spec.nodeName }}"
@@ -21,7 +21,7 @@
         phase: "{{ target_pod.status.phase }}"
       when: target_pod is defined
 
-    - name: Просмотр информации о поде
+    - name: Debug facts for target pod
       debug:
         msg:
           - "Имя: {{ pod_name }}"
@@ -31,7 +31,7 @@
           - "Статус: {{ phase }}"
       when: target_pod is defined
 
-    - name: Ошибка если под не найден
+    - name: Error if pod not found
       fail:
         msg: "Под с именем {{ resource_name }} не найден в namespace lmchz"
       when: target_pod is not defined

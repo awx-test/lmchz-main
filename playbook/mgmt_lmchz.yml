@@ -121,40 +121,43 @@
         msg: "{{ configmap_deploy_result }} {{ deployment_deploy_result }} {{ service_deploy_result }}"
 
 ###########################################################################################################
-#    - name: Set ip magazin proxy
-#      community.routeros.command:
-#        commands:
-#          - /ip proxy set cache-path=web-proxy1 enabled=yes max-cache-size=10000KiB src-address="{{ mtip }}"
-#          - /ip proxy access remove numbers=0
-#          - delay 1s
-#          - /ip proxy access remove numbers=1
-#          - delay 1s
-#          - /ip proxy access remove numbers=2
-#          - delay 1s
-#          - /ip proxy access remove numbers=0
-#          - delay 1s
-#          - /ip proxy access remove numbers=1
-#          - delay 1s
-#          - /ip proxy access remove numbers=2
-#          - delay 1s
-#          - /ip proxy access remove numbers=0
-#          - delay 1s
-#          - /ip proxy access remove numbers=1
-#          - delay 1s
-#          - /ip proxy access remove numbers=2
-#          - delay 5s
-#          - /ip proxy access add src-address="{{ service_ip }}" action=allow
-#          - delay 5s
-#          - /ip proxy access add action=deny
-#      delegate_to: "{{ mtip }}"
-#      register: proxyset
-#      when:
-#        - varisok == 1 and state_in_table == "RUN"
+
+    - name: Set ip store proxy
+      community.routeros.command:
+        commands:
+          - /ip proxy set cache-path=web-proxy1 enabled=yes max-cache-size=10000KiB src-address="{{ mtip }}"
+          - /ip proxy access remove numbers=0
+          - delay 1s
+          - /ip proxy access remove numbers=1
+          - delay 1s
+          - /ip proxy access remove numbers=2
+          - delay 1s
+          - /ip proxy access remove numbers=0
+          - delay 1s
+          - /ip proxy access remove numbers=1
+          - delay 1s
+          - /ip proxy access remove numbers=2
+          - delay 1s
+          - /ip proxy access remove numbers=0
+          - delay 1s
+          - /ip proxy access remove numbers=1
+          - delay 1s
+          - /ip proxy access remove numbers=2
+          - delay 5s
+          - /ip proxy access add src-address="{{ host_ip }}" action=allow
+          - delay 5s
+          - /ip proxy access add action=deny
+      delegate_to: "{{ mtip }}"
+      register: proxyset
+      when:
+        - varisok == 1 and state_in_table == "RUN"
+
 ##################################################################################################################
-#    - name: Pause 15s for up proxy
-#      ansible.builtin.pause:
-#        seconds: 15
-#      when: varisok == 1 and state_in_table == "RUN" and proxyset.changed
+
+    - name: Pause 15s for up proxy
+      ansible.builtin.pause:
+        seconds: 15
+      when: varisok == 1 and state_in_table == "RUN" and proxyset.changed
 
     - name: Check lmchz is UP
       ansible.builtin.uri:
@@ -205,13 +208,3 @@
 #      delay: 30
 #      when:
 #        - varisok == 1 and state_in_table == "RUN"
-#
-#    - name: Set API token
-#      ansible.builtin.set_fact:
-#        ansible_zabbix_auth_key: "{{ zabbixtoken }}"
-
-#    - name: Import task zabbixaddhost
-#      ansible.builtin.import_tasks:
-#        file: zabbixaddhost.yml
-#      when:
-#        - varisok == 1
