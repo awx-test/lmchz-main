@@ -80,7 +80,7 @@
 
     - name: SET current_state
       ansible.builtin.set_fact:
-        current_state: poweredon
+        current_state: present
       when:
         - varisok == 1 and state_in_table == "RUN"
 
@@ -103,6 +103,11 @@
         resource_name_log: Deployment
         path_template: "{{ playbook_dir }}/../templates/deployment.yml.j2"
       register: deployment_deploy_result
+
+    - name: Получить список всех подов в namespace
+      include_tasks: includes/debug_pods.yml
+      when:
+        - varisok == 1 and current_state == "present"
 
     - name: Deploy Service
       include_tasks: includes/deploy_resource.yml

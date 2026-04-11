@@ -17,7 +17,7 @@ spec:
       labels:
         app: lmchz-app
         instance: {{ resource_name }}
-        expected-ip: {{ service_ip }}
+        expected-ip: "{{ service_ip }}"
     spec:
       containers:
       - name: {{ resource_name }}

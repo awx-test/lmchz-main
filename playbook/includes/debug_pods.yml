@@ -1,0 +1,16 @@
+    - name: Получить список всех подов в namespace
+      kubernetes.core.k8s_info:
+        host: "{{ k8s_host }}"
+        api_key: "{{ k8s_api_key }}"
+        validate_certs: "{{ k8s_validate_certs }}"
+        kind: Pod
+        namespace: "lmchz"
+      register: pod_list
+
+    - name: Показать список подов
+      debug:
+        msg: "{{ pod_list.resources | map(attribute='metadata.name') | list }}"
+
+    - name: Показать детальную информацию о подах
+      debug:
+        var: pod_list.resources
