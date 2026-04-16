@@ -147,17 +147,6 @@
           - /ip proxy access add src-address="{{ host_ip }}" action=allow
           - delay 5s
           - /ip proxy access add action=deny
-      vars:
-        ansible_connection: ansible.netcommon.network_cli
-        ansible_network_os: community.routeros.routeros
-        ansible_remote_tmp: null
-        # Использование Paramiko критично, так как он игнорирует системные политики crypto-policy
-        ansible_network_cli_ssh_type: paramiko
-
-        ansible_ssh_common_args: >
-          -o KexAlgorithms=+diffie-hellman-group1-sha1,diffie-hellman-group-exchange-sha1
-          -o HostKeyAlgorithms=+ssh-rsa
-          -o PubkeyAcceptedKeyTypes=+ssh-rsa
       delegate_to: "{{ mtip }}"
       register: proxyset
       when:
