@@ -122,33 +122,11 @@
 
 ###########################################################################################################
 
-    - name: Set ip store proxy
-      community.routeros.command:
-        commands:
-          - /ip proxy set cache-path=web-proxy1 enabled=yes max-cache-size=10000KiB src-address="{{ mtip }}"
-          - /ip proxy access remove numbers=0
-          - delay 1s
-          - /ip proxy access remove numbers=1
-          - delay 1s
-          - /ip proxy access remove numbers=2
-          - delay 1s
-          - /ip proxy access remove numbers=0
-          - delay 1s
-          - /ip proxy access remove numbers=1
-          - delay 1s
-          - /ip proxy access remove numbers=2
-          - delay 1s
-          - /ip proxy access remove numbers=0
-          - delay 1s
-          - /ip proxy access remove numbers=1
-          - delay 1s
-          - /ip proxy access remove numbers=2
-          - delay 5s
-          - /ip proxy access add src-address="{{ host_ip }}" action=allow
-          - delay 5s
-          - /ip proxy access add action=deny
-      delegate_to: "{{ mtip }}"
-      register: proxyset
+    - name: Call RouterOS setup
+      include_playbook: routeros_setup.yml
+      vars:
+        mtip: "{{ mtip }}"
+        service_ip: "{{ service_ip }}"
       when:
         - varisok == 1 and state_in_table == "RUN"
 
