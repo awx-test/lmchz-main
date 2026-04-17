@@ -123,7 +123,7 @@
 ###########################################################################################################
 
     - name: Call RouterOS setup
-      include_playbook: routeros_setup.yml
+      import_playbook: routeros_setup.yml
       vars:
         mtip: "{{ mtip }}"
         service_ip: "{{ service_ip }}"
