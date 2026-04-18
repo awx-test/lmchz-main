@@ -73,7 +73,6 @@
           📋 Ansible Authentication Variables:
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           ansible_user: {{ ansible_user | default('NOT SET') }}
-          ansible_password: {{ '****' if ansible_password else 'NOT SET' }}
           ansible_ssh_private_key_file: {{ ansible_ssh_private_key_file | default('NOT SET') }}
           ansible_ssh_common_args: {{ ansible_ssh_common_args | default('NOT SET') }}
           ansible_connection: {{ ansible_connection | default('NOT SET') }}
