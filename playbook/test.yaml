@@ -9,38 +9,48 @@
     ansible_ssh_private_key_file: "/runner/artifacts/{{ awx_job_id }}/ssh_key_data"
 
   pre_tasks:
-    # 1. Находим ключ надёжным способом (shell не зависит от модулей Ansible)
-    - name: Find SSH key path
-      ansible.builtin.shell: ls -t /runner/artifacts/*/ssh_key_data 2>/dev/null | head -1
-      register: key_search
+    # 1. Проверяем, что директория артефактов существует
+    - name: Check artifacts directory
+      ansible.builtin.raw: ls -la /runner/artifacts/
+      register: artifacts_dir
       delegate_to: localhost
       run_once: true
       changed_when: false
 
-    - name: Fail if key missing
-      ansible.builtin.fail:
-        msg: |
-          🔑 SSH key not found in /runner/artifacts!
-          Проверьте: Credential типа "Machine" привязан к Job Template и содержит SSH Private Key.
-      when: key_search.stdout == ""
-
-    # 2. Копируем в /tmp и делаем читаемым для UID 1000
-    - name: Copy key to /tmp & fix permissions
-      ansible.builtin.command: >
-        bash -c "cp '{{ key_search.stdout }}' /tmp/awx_ros_key && chmod 644 /tmp/awx_ros_key"
-      delegate_to: localhost
-      run_once: true
-      changed_when: false
-
-    # 3. Передаём стабильный путь в network_cli
-    - name: Set key path
-      ansible.builtin.set_fact:
-        ansible_ssh_private_key_file: /tmp/awx_ros_key
-
-    - name: Debug resolved config
+    - name: Show artifacts
       ansible.builtin.debug:
-        msg: "✅ Key: {{ ansible_ssh_private_key_file }} | SSH type: {{ ansible_network_cli_ssh_type }}"
+        var: artifacts_dir.stdout_lines
 
+    # 2. Ищем файл ключа (берём последний по времени)
+    - name: Find SSH key with explicit permissions fix
+      ansible.builtin.shell: |
+        KEY_FILE=$(find /runner/artifacts -name "ssh_key_data" -type f 2>/dev/null | head -1)
+        if [ -n "$KEY_FILE" ]; then
+          # Исправляем права, чтобы пользователь 1000 мог читать
+          chmod 644 "$KEY_FILE" 2>/dev/null || true
+          chmod 755 $(dirname "$KEY_FILE") 2>/dev/null || true
+          echo "$KEY_FILE"
+        else
+          echo "NOT_FOUND"
+        fi
+      register: key_path
+      delegate_to: localhost
+      run_once: true
+      changed_when: false
+
+    - name: Fail if key not found
+      ansible.builtin.fail:
+        msg: "SSH key not found! Check Credential type is 'Machine' and contains SSH Private Key."
+      when: key_path.stdout == "NOT_FOUND"
+
+    # 3. Устанавливаем путь
+    - name: Set SSH key path
+      ansible.builtin.set_fact:
+        ansible_ssh_private_key_file: "{{ key_path.stdout }}"
+
+    - name: Debug auth config
+      ansible.builtin.debug:
+        msg: "✅ Using key: {{ ansible_ssh_private_key_file }}"
 
   tasks:
     - name: Show actual auth vars passed to network_cli
