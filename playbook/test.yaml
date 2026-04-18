@@ -22,10 +22,9 @@
         msg: "🔑 SSH_AUTH_SOCK: {{ lookup('env', 'SSH_AUTH_SOCK') | default('NOT SET') }}"
 
     - name: Test RouterOS connection
-      community.routeros.routeros_command:
+      community.routeros.command:
         commands:
           - /system resource print
-          - /interface print where type=ether
       register: result
 
     - name: Show output
