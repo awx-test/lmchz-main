@@ -122,28 +122,11 @@
 
 ###########################################################################################################
 
-    - name: Debug environment and key location
-      ansible.builtin.debug:
-        msg: |
-          ANSIBLE_PRIVATE_KEY_FILE: {{ lookup('env', 'ANSIBLE_PRIVATE_KEY_FILE') }}
-          AWX_PRIVATE_KEY_PATH: {{ lookup('env', 'AWX_PRIVATE_KEY_PATH') }}
-
-          Checking possible key paths:
-          /runner/env/ssh_key exists: {{ lookup('file', '/runner/env/ssh_key', errors='warn') | ternary('YES', 'NO') }}
-          /runner/env/ssh_key_data exists: {{ lookup('file', '/runner/env/ssh_key_data', errors='warn') | ternary('YES', 'NO') }}
-          /etc/awx/keys/ssh_key exists: {{ lookup('file', '/etc/awx/keys/ssh_key', errors='warn') | ternary('YES', 'NO') }}
+    - name: Fix SSH key permissions (if AWX injected it)
+      ansible.builtin.file:
+        path: "{{ lookup('env', 'ANSIBLE_PRIVATE_KEY_FILE') | default('/runner/env/ssh_key') }}"
+        mode: '0600'
       ignore_errors: yes
-
-    - name: List /runner/env/ directory
-      ansible.builtin.shell: ls -la /runner/env/ 2>&1 || echo "Directory not accessible"
-      register: env_listing
-      changed_when: false
-
-    - name: Show env directory contents
-      ansible.builtin.debug:
-        var: env_listing.stdout_lines
-
-###########################################################################################################
 
     - name: Set ip store proxy
       community.routeros.command:
@@ -171,6 +154,8 @@
           - delay 5s
           - /ip proxy access add action=deny
       delegate_to: "{{ mtip }}"
+      vars:
+        ansible_ssh_private_key_file: "{{ lookup('env', 'ANSIBLE_PRIVATE_KEY_FILE') | default('/runner/env/ssh_key') }}"
       register: proxyset
       when:
         - varisok == 1 and state_in_table == "RUN"
