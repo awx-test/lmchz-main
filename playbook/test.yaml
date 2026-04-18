@@ -9,35 +9,38 @@
     ansible_ssh_private_key_file: "/runner/artifacts/{{ awx_job_id }}/ssh_key_data"
 
   pre_tasks:
-    # 1. Находим файл ключа, который AWX только что создал
-    - name: Find AWX injected SSH key
-      ansible.builtin.find:
-        paths: "/runner/artifacts"
-        patterns: "ssh_key_data"
-        recurse: true
-        file_type: file
+    # 1. Находим ключ надёжным способом (shell не зависит от модулей Ansible)
+    - name: Find SSH key path
+      ansible.builtin.shell: ls -t /runner/artifacts/*/ssh_key_data 2>/dev/null | head -1
       register: key_search
       delegate_to: localhost
       run_once: true
+      changed_when: false
 
-    # 2. Копируем ключ в /tmp (обходит изоляцию /runner/artifacts)
-    - name: Copy key to persistent location
-      ansible.builtin.command: cp "{{ key_search.files[0].path }}" /tmp/awx_ros_key
+    - name: Fail if key missing
+      ansible.builtin.fail:
+        msg: |
+          🔑 SSH key not found in /runner/artifacts!
+          Проверьте: Credential типа "Machine" привязан к Job Template и содержит SSH Private Key.
+      when: key_search.stdout == ""
+
+    # 2. Копируем в /tmp и делаем читаемым для UID 1000
+    - name: Copy key to /tmp & fix permissions
+      ansible.builtin.command: >
+        bash -c "cp '{{ key_search.stdout }}' /tmp/awx_ros_key && chmod 644 /tmp/awx_ros_key"
       delegate_to: localhost
       run_once: true
       changed_when: false
-      when: key_search.matched > 0
 
-    # 3. Назначаем новый путь и строгие SSH-флаги
-    - name: Apply fixed key path
+    # 3. Передаём стабильный путь в network_cli
+    - name: Set key path
       ansible.builtin.set_fact:
-        ansible_ssh_private_key_file: "/tmp/awx_ros_key"
-        ansible_ssh_extra_args: "-o IdentitiesOnly=yes -o StrictHostKeyChecking=no"
-      when: key_search.matched > 0
+        ansible_ssh_private_key_file: /tmp/awx_ros_key
 
-    - name: Debug resolved path
+    - name: Debug resolved config
       ansible.builtin.debug:
-        msg: "✅ Using copied key: {{ ansible_ssh_private_key_file }}"
+        msg: "✅ Key: {{ ansible_ssh_private_key_file }} | SSH type: {{ ansible_network_cli_ssh_type }}"
+
 
   tasks:
     - name: Show actual auth vars passed to network_cli
