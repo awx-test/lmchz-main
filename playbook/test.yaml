@@ -15,6 +15,14 @@
 #    ansible_ssh_private_key_file: ""
 
 #    ansible_ssh_common_args: "-o IdentitiesOnly=yes -o StrictHostKeyChecking=no"
+    # 🔑 КРИТИЧНО: Говорим Ansible использовать SSH-Agent, а не файл
+    ansible_ssh_use_ssh_agent: true
+
+    # Очищаем путь к файлу, чтобы модуль не пытался его открыть
+    ansible_ssh_private_key_file: ""
+
+    # Используем libssh (он лучше дружит с агентом в контейнерах)
+    ansible_network_cli_ssh_type: libssh
 
   tasks:
     - name: Verify SSH Agent is active
@@ -33,13 +41,13 @@
           - "  ansible_connection: {{ ansible_connection | default('NOT SET') }}"
       run_once: yes
 
-    - name: Debug SSH connection details
-      ansible.builtin.raw: "cat /runner/artifacts/{{ awx_job_id }}/ssh_key_data"
-      register: file_output
-
-    - name: Show SSH key file content
-      debug:
-        msg: "SSH key file content: {{ file_output.stdout }}"
+#    - name: Debug SSH connection details
+#      ansible.builtin.raw: "cat /runner/artifacts/{{ awx_job_id }}/ssh_key_data"
+#      register: file_output
+#
+#    - name: Show SSH key file content
+#      debug:
+#        msg: "SSH key file content: {{ file_output.stdout }}"
 
     - name: Test RouterOS connection
       community.routeros.command:
