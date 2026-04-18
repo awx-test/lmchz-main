@@ -6,7 +6,38 @@
     ansible_network_os: community.routeros.routeros
     ansible_user: awx
     ansible_port: 22
-#    ansible_ssh_private_key_file: "/runner/artifacts/{{ awx_job_id }}/ssh_key_data"
+    ansible_ssh_private_key_file: "/runner/artifacts/{{ awx_job_id }}/ssh_key_data"
+
+  pre_tasks:
+    # 1. Находим файл ключа, который AWX только что создал
+    - name: Find AWX injected SSH key
+      ansible.builtin.find:
+        paths: "/runner/artifacts"
+        patterns: "ssh_key_data"
+        recurse: true
+        file_type: file
+      register: key_search
+      delegate_to: localhost
+      run_once: true
+
+    # 2. Копируем ключ в /tmp (обходит изоляцию /runner/artifacts)
+    - name: Copy key to persistent location
+      ansible.builtin.command: cp "{{ key_search.files[0].path }}" /tmp/awx_ros_key
+      delegate_to: localhost
+      run_once: true
+      changed_when: false
+      when: key_search.matched > 0
+
+    # 3. Назначаем новый путь и строгие SSH-флаги
+    - name: Apply fixed key path
+      ansible.builtin.set_fact:
+        ansible_ssh_private_key_file: "/tmp/awx_ros_key"
+        ansible_ssh_extra_args: "-o IdentitiesOnly=yes -o StrictHostKeyChecking=no"
+      when: key_search.matched > 0
+
+    - name: Debug resolved path
+      ansible.builtin.debug:
+        msg: "✅ Using copied key: {{ ansible_ssh_private_key_file }}"
 
   tasks:
     - name: Show actual auth vars passed to network_cli
@@ -26,11 +57,11 @@
         commands: /system resource print
       vars:
         ansible_network_cli_ssh_type: libssh
-#        ansible_ssh_extra_args: >-
-#          -o IdentityFile={{ ansible_ssh_private_key_file }}
-#          -o IdentitiesOnly=yes
-#          -o StrictHostKeyChecking=no
-#          -o PreferredAuthentications=publickey
+        ansible_ssh_extra_args: >-
+          -o IdentityFile={{ ansible_ssh_private_key_file }}
+          -o IdentitiesOnly=yes
+          -o StrictHostKeyChecking=no
+          -o PreferredAuthentications=publickey
       register: test_result
       ignore_errors: true
 
