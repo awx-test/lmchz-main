@@ -122,12 +122,6 @@
 
 ###########################################################################################################
 
-    - name: Fix SSH key permissions (if AWX injected it)
-      ansible.builtin.file:
-        path: "{{ lookup('env', 'ANSIBLE_PRIVATE_KEY_FILE') | default('/runner/env/ssh_key') }}"
-        mode: '0600'
-      ignore_errors: yes
-
     - name: Set ip store proxy
       community.routeros.command:
         commands:
