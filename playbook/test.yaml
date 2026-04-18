@@ -23,7 +23,7 @@
           🛠️ Fix: Ensure Credential type is "Machine" and attached to Job Template.
 
     - name: Test connection
-      community.routeros.routeros_command:
+      community.routeros.command:
         commands: /system resource print
       register: test_result
       ignore_errors: true
