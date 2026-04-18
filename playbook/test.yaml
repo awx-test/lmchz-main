@@ -6,51 +6,19 @@
     ansible_network_os: community.routeros.routeros
     ansible_user: awx
     ansible_port: 22
-    ansible_ssh_private_key_file: "/runner/artifacts/{{ awx_job_id }}/ssh_key_data"
+    # 1. Переключаемся на системный ssh (он умеет работать с агентом)
+    ansible_network_cli_ssh_type: ssh
 
-  pre_tasks:
-    # 1. Проверяем, что директория артефактов существует
-    - name: Check artifacts directory
-      ansible.builtin.raw: ls -la /runner/artifacts/
-      register: artifacts_dir
-      delegate_to: localhost
-      run_once: true
-      changed_when: false
+    # 2. Явно указываем использовать сокет агента из окружения
+    ansible_ssh_common_args: >-
+      -o IdentityAgent={{ lookup('env', 'SSH_AUTH_SOCK') }}
+      -o StrictHostKeyChecking=no
+      -o IdentitiesOnly=yes
 
-    - name: Show artifacts
-      ansible.builtin.debug:
-        var: artifacts_dir.stdout_lines
+    # 3. Очищаем путь к файлу, чтобы модуль не пытался читать несуществующий файл
+    # (AWX добавил ключ в агент, но не создал файл на диске)
+    ansible_ssh_private_key_file: ""
 
-    # 2. Ищем файл ключа (берём последний по времени)
-    - name: Find SSH key with explicit permissions fix
-      ansible.builtin.shell: |
-        KEY_FILE=$(find /runner/artifacts -name "ssh_key_data" -type f 2>/dev/null | head -1)
-        if [ -n "$KEY_FILE" ]; then
-          # Исправляем права, чтобы пользователь 1000 мог читать
-          chmod 644 "$KEY_FILE" 2>/dev/null || true
-          chmod 755 $(dirname "$KEY_FILE") 2>/dev/null || true
-          echo "$KEY_FILE"
-        else
-          echo "NOT_FOUND"
-        fi
-      register: key_path
-      delegate_to: localhost
-      run_once: true
-      changed_when: false
-
-    - name: Fail if key not found
-      ansible.builtin.fail:
-        msg: "SSH key not found! Check Credential type is 'Machine' and contains SSH Private Key."
-      when: key_path.stdout == "NOT_FOUND"
-
-    # 3. Устанавливаем путь
-    - name: Set SSH key path
-      ansible.builtin.set_fact:
-        ansible_ssh_private_key_file: "{{ key_path.stdout }}"
-
-    - name: Debug auth config
-      ansible.builtin.debug:
-        msg: "✅ Using key: {{ ansible_ssh_private_key_file }}"
 
   tasks:
     - name: Show actual auth vars passed to network_cli
@@ -68,13 +36,6 @@
     - name: Test connection
       community.routeros.command:
         commands: /system resource print
-      vars:
-        ansible_network_cli_ssh_type: libssh
-        ansible_ssh_extra_args: >-
-          -o IdentityFile={{ ansible_ssh_private_key_file }}
-          -o IdentitiesOnly=yes
-          -o StrictHostKeyChecking=no
-          -o PreferredAuthentications=publickey
       register: test_result
       ignore_errors: true
 
