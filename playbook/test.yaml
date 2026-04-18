@@ -1,144 +1,33 @@
-- name: Debug SSH Key Availability in AWX EE
-  hosts: localhost  # Выполняем внутри контейнера, не подключаемся к устройству
+- name: Debug MikroTik Host Vars
+  hosts: 10.254.1.64  # Замените на имя/IP хоста из вашего инвентаря
   gather_facts: false
-  connection: local
-
+  connection: ansible.netcommon.network_cli
   vars:
-    ssh_key_path: "/runner/env/ssh_key"
-    ssh_pub_key_path: "/runner/env/ssh_key.pub"
+    ansible_network_os: community.routeros.routeros
+    ansible_user: awx
+    ansible_port: 22
 
   tasks:
-    # === 1. Проверка существования файла ключа ===
-    - name: Check if SSH private key exists
-      ansible.builtin.stat:
-        path: "{{ ssh_key_path }}"
-      register: ssh_key_stat
-
-    - name: Show SSH key file status
+    - name: Show actual auth vars passed to network_cli
       ansible.builtin.debug:
         msg: |
-          🔑 SSH Private Key: {{ ssh_key_path }}
+          📋 Network Auth Variables:
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          Exists: {{ ssh_key_stat.stat.exists }}
-          Is File: {{ ssh_key_stat.stat.isreg | default('N/A') }}
-          Size: {{ ssh_key_stat.stat.size | default('N/A') }} bytes
-          Mode: {{ ssh_key_stat.stat.mode | default('N/A') }}
-          Owner UID: {{ ssh_key_stat.stat.uid | default('N/A') }}
-          Owner GID: {{ ssh_key_stat.stat.gid | default('N/A') }}
-          Readable: {{ ssh_key_stat.stat.readable | default('N/A') }}
-
-    # === 2. Проверка прав доступа (через shell, так как stat не показывает группу по имени) ===
-    - name: Get detailed permissions for ssh_key
-      ansible.builtin.raw: ls -la {{ ssh_key_path }} 2>&1 || echo "FILE NOT FOUND"
-      register: key_perms
-      changed_when: false
-      ignore_errors: true
-
-    - name: Show key permissions
-      ansible.builtin.debug:
-        var: key_perms.stdout
-
-    # === 3. Проверка содержимого (только заголовок, НЕ весь ключ!) ===
-    - name: Show SSH key header (first 2 lines, SAFE)
-      ansible.builtin.raw: head -n 2 {{ ssh_key_path }} 2>&1 || echo "CANNOT READ"
-      register: key_header
-      changed_when: false
-      ignore_errors: true
-
-    - name: Show key header output
-      ansible.builtin.debug:
-        msg: |
-          🔐 Key Header (first 2 lines):
-          {{ key_header.stdout | indent(2) }}
-          ⚠️  Full key content is NOT displayed for security.
-
-    # === 4. Проверка публичного ключа (если есть) ===
-    - name: Check if SSH public key exists
-      ansible.builtin.stat:
-        path: "{{ ssh_pub_key_path }}"
-      register: ssh_pub_stat
-
-    - name: Show SSH public key status
-      ansible.builtin.debug:
-        msg: |
-          🔓 SSH Public Key: {{ ssh_pub_key_path }}
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          Exists: {{ ssh_pub_stat.stat.exists }}
-          Readable: {{ ssh_pub_stat.stat.readable | default('N/A') }}
-
-    # === 5. Проверка переменных Ansible, связанных с аутентификацией ===
-    - name: Show Ansible auth-related variables
-      ansible.builtin.debug:
-        msg: |
-          📋 Ansible Authentication Variables:
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          ansible_user: {{ ansible_user | default('NOT SET') }}
+          ansible_user: {{ ansible_user }}
           ansible_ssh_private_key_file: {{ ansible_ssh_private_key_file | default('NOT SET') }}
-          ansible_ssh_common_args: {{ ansible_ssh_common_args | default('NOT SET') }}
-          ansible_connection: {{ ansible_connection | default('NOT SET') }}
-          ansible_port: {{ ansible_port | default('22') }}
-
-    # === 6. Проверка переменных окружения ===
-    - name: Show relevant environment variables
-      ansible.builtin.debug:
-        msg: |
-          🌐 Environment Variables:
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          ansible_password: {{ '****' if ansible_password else 'NOT SET' }}
+          ansible_connection: {{ ansible_connection }}
           HOME: {{ lookup('env', 'HOME') }}
-          USER: {{ lookup('env', 'USER') }}
-          SSH_AUTH_SOCK: {{ lookup('env', 'SSH_AUTH_SOCK') | default('NOT SET') }}
-          ANSIBLE_PRIVATE_KEY_FILE: {{ lookup('env', 'ANSIBLE_PRIVATE_KEY_FILE') | default('NOT SET') }}
+          
+          🔑 If key path is NOT SET → AWX didn't inject it for network_cli.
+          🛠️ Fix: Ensure Credential type is "Machine" and attached to Job Template.
 
-    # === 7. Проверка, может ли пользователь читать ключ (тестовая команда) ===
-    - name: Test if current user can read the key
-      ansible.builtin.raw: test -r {{ ssh_key_path }} && echo "READABLE" || echo "NOT READABLE"
-      register: key_readable
-      changed_when: false
+    - name: Test connection
+      community.routeros.routeros_command:
+        commands: /system resource print
+      register: test_result
       ignore_errors: true
 
-    - name: Show readability test result
+    - name: Show connection result
       ansible.builtin.debug:
-        var: key_readable.stdout
-
-    # === 8. Проверка, что ssh-agent не требуется (для network_cli) ===
-    - name: Show SSH agent status
-      ansible.builtin.debug:
-        msg: |
-          🔄 SSH Agent Info:
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          SSH_AUTH_SOCK env: {{ lookup('env', 'SSH_AUTH_SOCK') | default('NOT SET') }}
-          Note: ansible.netcommon.network_cli does NOT use ssh-agent by default.
-          It reads key directly from ansible_ssh_private_key_file or Credential.
-
-    # === 9. Финальный сводный отчёт ===
-    - name: Final summary report
-      ansible.builtin.debug:
-        msg: |
-          📊 === SSH KEY DEBUG SUMMARY ===
-          ✅ Key file exists: {{ ssh_key_stat.stat.exists }}
-          ✅ Key is readable: {{ key_readable.stdout == 'READABLE' }}
-          ✅ Key has content: {{ ssh_key_stat.stat.size | default(0) > 0 }}
-          ✅ ansible_user set: {{ ansible_user | default('') | length > 0 }}
-          ✅ ansible_ssh_private_key_file: {{ ansible_ssh_private_key_file | default('NOT SET') }}
-          
-          🔧 If connection fails with "Access denied for 'none'":
-             1. Check that Credential of type "Machine" is attached to Job Template
-             2. Ensure no duplicate ansible_password/ansible_ssh_private_key_file in Inventory Variables
-             3. Verify RouterOS has the public key imported: /user ssh-keys import user=awx ...
-             4. For RouterOS 6.49: /ip ssh set always-allow-password-login=yes
-
-    # === 10. (Опционально) Тестовая попытка подключения с отладкой ===
-    # Раскомментируйте, если хотите протестировать реальное подключение
-    # - name: Test SSH connection to MikroTik (debug mode)
-    #   community.routeros.routeros_command:
-    #     commands: /system resource print
-    #   register: test_conn
-    #   ignore_errors: true
-    #   vars:
-    #     ansible_host: 10.254.1.64  # Замените на IP вашего MikroTik
-    #     ansible_network_os: community.routeros.routeros
-    #     ansible_connection: ansible.netcommon.network_cli
-    #
-    # - name: Show connection test result
-    #   ansible.builtin.debug:
-    #     var: test_conn
+        var: test_result
