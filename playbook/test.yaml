@@ -7,7 +7,7 @@
     ansible_user: awx
     ansible_port: 22
     # 1. Переключаемся на системный ssh (он умеет работать с агентом)
-    ansible_network_cli_ssh_type: ssh
+    ansible_network_cli_ssh_type: libssh
 
     # 2. Явно указываем использовать сокет агента из окружения
     ansible_ssh_common_args: >-
