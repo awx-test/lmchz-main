@@ -22,7 +22,7 @@
     ansible_ssh_private_key_file: ""
 
     # Используем libssh (он лучше дружит с агентом в контейнерах)
-    ansible_network_cli_ssh_type: libssh
+    ansible_network_cli_ssh_type: paramiko
 
   tasks:
     - name: Verify SSH Agent is active
