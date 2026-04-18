@@ -14,7 +14,7 @@
           📋 Network Auth Variables:
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           ansible_user: {{ ansible_user }}
-          ansible_ssh_private_key_file_before: "{{ lookup('env', 'ANSIBLE_PRIVATE_KEY_FILE')"
+          ansible_ssh_private_key_file_before: "{{ lookup('env', 'ANSIBLE_PRIVATE_KEY_FILE') }}"
           ansible_ssh_private_key_file: "/runner/artifacts/{{ lookup('env', 'ANSIBLE_RUNNER_JOB_ID') }}/ssh_key_data"
           ansible_connection: {{ ansible_connection }}
           HOME: {{ lookup('env', 'HOME') }}
