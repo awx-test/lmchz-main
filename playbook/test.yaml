@@ -4,7 +4,7 @@
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
-    ansible_user: awx
+    ansible_user: it
     ansible_port: 22
 
     # 🔧 Исправлено: 'ssh' не валиден. Используем paramiko (стабильнее с агентом)
