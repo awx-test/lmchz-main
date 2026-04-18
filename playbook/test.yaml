@@ -21,6 +21,18 @@
       ansible.builtin.debug:
         msg: "🔑 SSH_AUTH_SOCK: {{ lookup('env', 'SSH_AUTH_SOCK') | default('NOT SET') }}"
 
+    - name: Debug host groups and variables
+      debug:
+        msg:
+          - "Host: {{ inventory_hostname }}"
+          - "Groups: {{ group_names }}"
+          - "All variables:"
+          - "  ansible_user: {{ ansible_user | default('NOT SET') }}"
+          - "  ansible_password: {{ 'SET' if ansible_password is defined else 'NOT SET' }}"
+          - "  ansible_network_os: {{ ansible_network_os | default('NOT SET') }}"
+          - "  ansible_connection: {{ ansible_connection | default('NOT SET') }}"
+      run_once: yes
+
     - name: Test RouterOS connection
       community.routeros.command:
         commands:
