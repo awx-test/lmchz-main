@@ -144,7 +144,7 @@
           - delay 1s
           - /ip proxy access remove numbers=2
           - delay 5s
-          - /ip proxy access add src-address="{{ host_ip }}" action=allow
+          - /ip proxy access add src-address="{{ 10.216.1.240-10.216.1.250 }}" action=allow
           - delay 5s
           - /ip proxy access add action=deny
       delegate_to: "{{ mtip }}"
