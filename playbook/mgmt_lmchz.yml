@@ -155,7 +155,7 @@
           - /ip proxy access add action=deny
       delegate_to: "{{ mtip }}"
       vars:
-        ansible_ssh_private_key_file: "{{ lookup('env', 'ANSIBLE_PRIVATE_KEY_FILE') | default('/runner/env/ssh_key') }}"
+        ansible_ssh_private_key_file: /runner/env/ssh_key
       register: proxyset
       when:
         - varisok == 1 and state_in_table == "RUN"
