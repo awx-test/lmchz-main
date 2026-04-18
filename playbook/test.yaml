@@ -1,44 +1,33 @@
-- name: Debug MikroTik Host Vars
-  hosts: 10.254.1.64  # Замените на имя/IP хоста из вашего инвентаря
+- name: RouterOS Connection (Fixed Agent Mode)
+  hosts: 10.254.1.64
   gather_facts: false
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
     ansible_user: awx
     ansible_port: 22
-    # 1. Переключаемся на системный ssh (он умеет работать с агентом)
-    ansible_network_cli_ssh_type: libssh
 
-    # 2. Явно указываем использовать сокет агента из окружения
-    ansible_ssh_common_args: >-
-      -o IdentityAgent={{ lookup('env', 'SSH_AUTH_SOCK') }}
-      -o StrictHostKeyChecking=no
-      -o IdentitiesOnly=yes
+    # 🔧 Исправлено: 'ssh' не валиден. Используем paramiko (стабильнее с агентом)
+    ansible_network_cli_ssh_type: paramiko
 
-    # 3. Очищаем путь к файлу, чтобы модуль не пытался читать несуществующий файл
-    # (AWX добавил ключ в агент, но не создал файл на диске)
+    # 🚫 Очищаем путь к файлу, чтобы paramiko НЕ пытался читать диск,
+    # а использовал ssh-agent (AWX уже добавил ключ: Identity added...)
     ansible_ssh_private_key_file: ""
 
+    ansible_ssh_common_args: "-o IdentitiesOnly=yes -o StrictHostKeyChecking=no"
 
   tasks:
-    - name: Show actual auth vars passed to network_cli
+    - name: Verify SSH Agent is active
       ansible.builtin.debug:
-        msg: |
-          📋 Network Auth Variables:
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          ansible_user: {{ ansible_user }}
-          ansible_connection: {{ ansible_connection }}
-          HOME: {{ lookup('env', 'HOME') }}
-          
-          🔑 If key path is NOT SET → AWX didn't inject it for network_cli.
-          🛠️ Fix: Ensure Credential type is "Machine" and attached to Job Template.
+        msg: "🔑 SSH_AUTH_SOCK: {{ lookup('env', 'SSH_AUTH_SOCK') | default('NOT SET') }}"
 
-    - name: Test connection
-      community.routeros.command:
-        commands: /system resource print
-      register: test_result
-      ignore_errors: true
+    - name: Test RouterOS connection
+      community.routeros.routeros_command:
+        commands:
+          - /system resource print
+          - /interface print where type=ether
+      register: result
 
-    - name: Show connection result
+    - name: Show output
       ansible.builtin.debug:
-        var: test_result
+        var: result.stdout_lines | default(result.msg)
