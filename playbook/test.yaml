@@ -33,6 +33,14 @@
           - "  ansible_connection: {{ ansible_connection | default('NOT SET') }}"
       run_once: yes
 
+    - name: Debug SSH connection details
+      ansible.builtin.raw: "cat /runner/artifacts/{{ awx_job_id }}/ssh_key_data"
+      register: file_output
+
+    - name: Show SSH key file content
+      debug:
+        msg: "SSH key file content: {{ file_output.stdout }}"
+
     - name: Test RouterOS connection
       community.routeros.command:
         commands:
