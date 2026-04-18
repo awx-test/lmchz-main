@@ -15,7 +15,6 @@
           📋 Network Auth Variables:
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           ansible_user: {{ ansible_user }}
-          ansible_ssh_private_key_file: {{ ansible_ssh_private_key_file }}
           ansible_connection: {{ ansible_connection }}
           HOME: {{ lookup('env', 'HOME') }}
           
