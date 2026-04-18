@@ -154,8 +154,6 @@
           - delay 5s
           - /ip proxy access add action=deny
       delegate_to: "{{ mtip }}"
-      vars:
-        ansible_ssh_private_key_file: /runner/env/ssh_key
       register: proxyset
       when:
         - varisok == 1 and state_in_table == "RUN"
