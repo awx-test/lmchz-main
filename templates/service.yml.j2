@@ -7,7 +7,7 @@ metadata:
     metallb.universe.tf/loadBalancerIPs: {{ service_ip }}
 spec:
   type: LoadBalancer
-  externalTrafficPolicy: Cluster
+  externalTrafficPolicy: Local
   selector:
     instance: {{ resource_name }}
   ports:
